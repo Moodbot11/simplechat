@@ -2,6 +2,7 @@ import os
 import base64
 import streamlit as st
 import openai
+import tempfile
 
 # Function to convert text to speech using OpenAI's API and return audio bytes
 def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
@@ -57,7 +58,8 @@ if input_method == "Text Input":
         st.write(f"You: {prompt}")
 
         response = openai.ChatCompletion.create(
-            model="gpt-4", messages=st.session_state.messages
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
         )
         msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
@@ -73,17 +75,19 @@ elif input_method == "Voice Input":
     uploaded_file = st.file_uploader("Upload your voice input (wav format)", type=["wav"])
 
     if uploaded_file is not None and openai_api_key:
-        with open(uploaded_file.name, "wb") as file:
-            file.write(uploaded_file.getbuffer())
+        with tempfile.NamedTemporaryFile(delete=False) as temp_audio_file:
+            temp_audio_file.write(uploaded_file.getbuffer())
+            temp_audio_file_path = temp_audio_file.name
 
-        prompt = convert_speech_to_text(uploaded_file.name, openai_api_key)
+        prompt = convert_speech_to_text(temp_audio_file_path, openai_api_key)
         st.write(f"You (transcribed): {prompt}")
 
         openai.api_key = openai_api_key
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4", messages=st.session_state.messages
+            model="gpt-4",
+            messages=st.session_state.messages
         )
         msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
