@@ -12,7 +12,7 @@ def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
         voice=voice,
         input=text
     )
-    audio_content = response['audio']
+    audio_content = response['data']
     return audio_content
 
 # Function to convert speech to text using OpenAI's API and return text transcription
@@ -59,7 +59,10 @@ if input_method == "Text Input":
 
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
         )
         msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
