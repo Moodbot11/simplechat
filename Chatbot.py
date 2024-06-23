@@ -50,12 +50,14 @@ class AudioProcessor(AudioProcessorBase):
             self.audio_queue.put(audio.tobytes())
         return frames[-1]
 
+# Read OpenAI API key from environment variables
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
 # Sidebar config
 with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
-    "[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[![Open in GitHub Codespaces](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    st.write("[Get an OpenAI API key](https://platform.openai.com/account/api-keys)")
+    st.write("[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)")
+    st.write("[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)")
 
 # Main title and caption
 st.title("💬 Chatbot with TTS and STT")
@@ -82,14 +84,16 @@ if webrtc_ctx.audio_processor:
 
     if audio_data:
         try:
+            st.write("Audio data captured.")
             prompt = convert_speech_to_text(audio_data, openai_api_key)
-            st.write(f"You (transcribed): {prompt}")
+            st.write(f"Transcription: {prompt}")
 
             openai.api_key = openai_api_key
             st.session_state.messages.append({"role": "user", "content": prompt})
 
+            st.write("Sending transcription to OpenAI ChatCompletion API...")
             response = openai.ChatCompletion.create(
-                model="gpt-4-turbo",  # Use GPT-4-turbo
+                model="gpt-4o",  # Use GPT-4-turbo
                 messages=st.session_state.messages
             )
             msg = response.choices[0].message['content']
@@ -97,6 +101,7 @@ if webrtc_ctx.audio_processor:
             st.write(f"Assistant: {msg}")
 
             # Convert response to audio and play it
+            st.write("Converting response to audio...")
             audio_content = convert_text_to_speech(msg, openai_api_key)
             audio_str = audio_bytes_to_base64(audio_content)
             st.audio(audio_str, format="audio/mp3")
