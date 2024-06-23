@@ -77,7 +77,7 @@ webrtc_ctx = webrtc_streamer(
     audio_processor_factory=AudioProcessor,
 )
 
-if webrtc_ctx.audio_processor:
+if webrtc_ctx.audio_processor and webrtc_ctx.state.playing:
     audio_processor = webrtc_ctx.audio_processor
     audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
@@ -104,3 +104,7 @@ if webrtc_ctx.audio_processor:
 # Display chat history
 for msg in st.session_state.messages:
     st.write(f"{msg['role'].capitalize()}: {msg['content']}")
+
+# Error handling for the WebRTC context
+if webrtc_ctx.state.status == "failed":
+    st.error("WebRTC connection failed. Please check your network settings and try again.")
