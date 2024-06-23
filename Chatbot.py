@@ -16,7 +16,7 @@ def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
         voice=voice,
         input=text
     )
-    audio_content = response['data']
+    audio_content = response['audio']
     return audio_content
 
 # Function to convert speech to text using OpenAI's API and return text transcription
@@ -77,8 +77,7 @@ webrtc_ctx = webrtc_streamer(
     audio_processor_factory=AudioProcessor,
 )
 
-# Check if the audio processor is available and if recording has started
-if webrtc_ctx.audio_processor and not webrtc_ctx.state.playing:
+if webrtc_ctx.audio_processor:
     audio_processor = webrtc_ctx.audio_processor
     audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
