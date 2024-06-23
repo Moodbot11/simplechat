@@ -1,12 +1,12 @@
 import os
 import base64
 import streamlit as st
-from openai import OpenAI
+import openai
 
 # Function to convert text to speech using OpenAI's API and return audio bytes
 def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
-    client = OpenAI(api_key=api_key)
-    response = client.audio.speech.create(
+    openai.api_key = api_key
+    response = openai.Audio.create(
         model=model,
         voice=voice,
         input=text
@@ -16,9 +16,9 @@ def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
 
 # Function to convert speech to text using OpenAI's API and return text transcription
 def convert_speech_to_text(audio_file_path, api_key):
-    client = OpenAI(api_key=api_key)
+    openai.api_key = api_key
     with open(audio_file_path, "rb") as audio_file:
-        response = client.audio.transcriptions.create(
+        response = openai.Audio.transcriptions.create(
             file=audio_file,
             model="whisper-1"
         )
@@ -52,14 +52,14 @@ input_method = st.radio("Choose input method:", ("Text Input", "Voice Input"))
 if input_method == "Text Input":
     prompt = st.text_input("You:")
     if prompt and openai_api_key:
-        client = OpenAI(api_key=openai_api_key)
+        openai.api_key = openai_api_key
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.write(f"You: {prompt}")
 
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4", messages=st.session_state.messages
         )
-        msg = response.choices[0].message.content
+        msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
         st.write(f"Assistant: {msg}")
 
@@ -79,13 +79,13 @@ elif input_method == "Voice Input":
         prompt = convert_speech_to_text(uploaded_file.name, openai_api_key)
         st.write(f"You (transcribed): {prompt}")
 
-        client = OpenAI(api_key=openai_api_key)
+        openai.api_key = openai_api_key
         st.session_state.messages.append({"role": "user", "content": prompt})
 
-        response = client.chat.completions.create(
-            model="gpt-4", messages=st.session_state.messages
+        response = openai.ChatCompletion.create(
+            model="gpt-4o", messages=st.session_state.messages
         )
-        msg = response.choices[0].message.content
+        msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
         st.write(f"Assistant: {msg}")
 
