@@ -83,7 +83,7 @@ elif input_method == "Voice Input":
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4o", messages=st.session_state.messages
+            model="gpt-4", messages=st.session_state.messages
         )
         msg = response.choices[0].message['content']
         st.session_state.messages.append({"role": "assistant", "content": msg})
