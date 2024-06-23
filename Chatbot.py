@@ -76,7 +76,7 @@ webrtc_ctx = webrtc_streamer(
     audio_processor_factory=AudioProcessor,
 )
 
-if webrtc_ctx.state.playing:
+if webrtc_ctx.audio_processor and webrtc_ctx.state.playing:
     audio_processor = webrtc_ctx.audio_processor
     audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
@@ -88,7 +88,7 @@ if webrtc_ctx.state.playing:
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4-turbo",  # Use GPT-4-turbo
             messages=st.session_state.messages
         )
         msg = response.choices[0].message['content']
