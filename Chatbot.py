@@ -16,7 +16,7 @@ def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
         voice=voice,
         input=text
     )
-    audio_content = response['audio']
+    audio_content = response['data']
     return audio_content
 
 # Function to convert speech to text using OpenAI's API and return text transcription
@@ -77,34 +77,30 @@ webrtc_ctx = webrtc_streamer(
     audio_processor_factory=AudioProcessor,
 )
 
-if webrtc_ctx.state.playing:
-    st.write("Recording...")
+# Check if the audio processor is available and if recording has started
+if webrtc_ctx.audio_processor and not webrtc_ctx.state.playing:
+    audio_processor = webrtc_ctx.audio_processor
+    audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
-    if st.button("Stop Recording"):
-        webrtc_ctx.stop()
+    if audio_data:
+        prompt = convert_speech_to_text(audio_data, openai_api_key)
+        st.write(f"You (transcribed): {prompt}")
 
-        audio_processor = webrtc_ctx.audio_processor
-        audio_data = b"".join(list(audio_processor.audio_queue.queue))
+        openai.api_key = openai_api_key
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-        if audio_data:
-            prompt = convert_speech_to_text(audio_data, openai_api_key)
-            st.write(f"You (transcribed): {prompt}")
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=st.session_state.messages
+        )
+        msg = response.choices[0].message['content']
+        st.session_state.messages.append({"role": "assistant", "content": msg})
+        st.write(f"Assistant: {msg}")
 
-            openai.api_key = openai_api_key
-            st.session_state.messages.append({"role": "user", "content": prompt})
-
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=st.session_state.messages
-            )
-            msg = response.choices[0].message['content']
-            st.session_state.messages.append({"role": "assistant", "content": msg})
-            st.write(f"Assistant: {msg}")
-
-            # Convert response to audio and play it
-            audio_content = convert_text_to_speech(msg, openai_api_key)
-            audio_str = audio_bytes_to_base64(audio_content)
-            st.audio(audio_str, format="audio/mp3")
+        # Convert response to audio and play it
+        audio_content = convert_text_to_speech(msg, openai_api_key)
+        audio_str = audio_bytes_to_base64(audio_content)
+        st.audio(audio_str, format="audio/mp3")
 
 # Display chat history
 for msg in st.session_state.messages:
