@@ -93,7 +93,7 @@ if webrtc_ctx.audio_processor:
 
             st.write("Sending transcription to OpenAI ChatCompletion API...")
             response = openai.ChatCompletion.create(
-                model="gpt-4o",  # Use GPT-4o
+                model="gpt-4-turbo",  # Use GPT-4-turbo
                 messages=st.session_state.messages
             )
             msg = response.choices[0].message['content']
