@@ -8,3 +8,4 @@ streamlit-feedback
 pydub
 requests
 openai>=1.0.0
+streamlit-webrtc
