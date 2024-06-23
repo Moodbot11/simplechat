@@ -55,7 +55,7 @@ with st.sidebar:
     openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
     "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
     "[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    "[![Open in GitHub Codespaces](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
 
 # Main title and caption
 st.title("💬 Chatbot with TTS and STT")
@@ -76,34 +76,33 @@ webrtc_ctx = webrtc_streamer(
     audio_processor_factory=AudioProcessor,
 )
 
-if webrtc_ctx.audio_processor and webrtc_ctx.state.playing:
+if webrtc_ctx.audio_processor:
     audio_processor = webrtc_ctx.audio_processor
     audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
     if audio_data:
-        prompt = convert_speech_to_text(audio_data, openai_api_key)
-        st.write(f"You (transcribed): {prompt}")
+        try:
+            prompt = convert_speech_to_text(audio_data, openai_api_key)
+            st.write(f"You (transcribed): {prompt}")
 
-        openai.api_key = openai_api_key
-        st.session_state.messages.append({"role": "user", "content": prompt})
+            openai.api_key = openai_api_key
+            st.session_state.messages.append({"role": "user", "content": prompt})
 
-        response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",  # Use GPT-4-turbo
-            messages=st.session_state.messages
-        )
-        msg = response.choices[0].message['content']
-        st.session_state.messages.append({"role": "assistant", "content": msg})
-        st.write(f"Assistant: {msg}")
+            response = openai.ChatCompletion.create(
+                model="gpt-4-turbo",  # Use GPT-4-turbo
+                messages=st.session_state.messages
+            )
+            msg = response.choices[0].message['content']
+            st.session_state.messages.append({"role": "assistant", "content": msg})
+            st.write(f"Assistant: {msg}")
 
-        # Convert response to audio and play it
-        audio_content = convert_text_to_speech(msg, openai_api_key)
-        audio_str = audio_bytes_to_base64(audio_content)
-        st.audio(audio_str, format="audio/mp3")
+            # Convert response to audio and play it
+            audio_content = convert_text_to_speech(msg, openai_api_key)
+            audio_str = audio_bytes_to_base64(audio_content)
+            st.audio(audio_str, format="audio/mp3")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
 # Display chat history
 for msg in st.session_state.messages:
     st.write(f"{msg['role'].capitalize()}: {msg['content']}")
-
-# Error handling for the WebRTC context
-if webrtc_ctx.state.iceConnectionState == "failed":
-    st.error("WebRTC connection failed. Please check your network settings and try again.")
