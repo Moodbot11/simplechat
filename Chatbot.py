@@ -16,7 +16,7 @@ def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
         voice=voice,
         input=text
     )
-    audio_content = response['data']
+    audio_content = response['audio']
     return audio_content
 
 # Function to convert speech to text using OpenAI's API and return text transcription
@@ -95,7 +95,7 @@ if input_method == "Text Input":
 elif input_method == "Voice Input":
     webrtc_ctx = webrtc_streamer(
         key="audio",
-        mode=ClientSettings(
+        client_settings=ClientSettings(
             rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
             media_stream_constraints={
                 "audio": True,
