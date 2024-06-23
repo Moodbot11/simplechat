@@ -2,5 +2,6 @@ openai>=1.0.0
 streamlit
 streamlit-webrtc
 langchain
-anthropic
-
+langchain_community
+streamlit_feedback
+trubrics
