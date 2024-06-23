@@ -64,56 +64,29 @@ st.caption("🚀 A Streamlit chatbot powered by OpenAI with TTS and STT")
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
-# Radio button to choose input method
-input_method = st.radio("Choose input method:", ("Text Input", "Voice Input"))
-
-# Handle text input
-if input_method == "Text Input":
-    prompt = st.text_input("You:")
-    if prompt and openai_api_key:
-        openai.api_key = openai_api_key
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.write(f"You: {prompt}")
-
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        msg = response.choices[0].message['content']
-        st.session_state.messages.append({"role": "assistant", "content": msg})
-        st.write(f"Assistant: {msg}")
-
-        # Convert response to audio and play it
-        audio_content = convert_text_to_speech(msg, openai_api_key)
-        audio_str = audio_bytes_to_base64(audio_content)
-        st.audio(audio_str, format="audio/mp3")
-
 # Handle voice input
-elif input_method == "Voice Input":
-    webrtc_ctx = webrtc_streamer(
-        key="audio",
-        client_settings=ClientSettings(
-            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-            media_stream_constraints={
-                "audio": True,
-                "video": False,
-            },
-        ),
-        audio_processor_factory=AudioProcessor,
-    )
+webrtc_ctx = webrtc_streamer(
+    key="audio",
+    client_settings=ClientSettings(
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        media_stream_constraints={
+            "audio": True,
+            "video": False,
+        },
+    ),
+    audio_processor_factory=AudioProcessor,
+)
 
-    if webrtc_ctx.state.playing:
-        st.write("Recording...")
+if webrtc_ctx.state.playing:
+    st.write("Recording...")
 
-        if st.button("Stop Recording"):
-            webrtc_ctx.stop()
+    if st.button("Stop Recording"):
+        webrtc_ctx.stop()
 
-            audio_processor = webrtc_ctx.audio_processor
-            audio_data = b"".join(list(audio_processor.audio_queue.queue))
+        audio_processor = webrtc_ctx.audio_processor
+        audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
+        if audio_data:
             prompt = convert_speech_to_text(audio_data, openai_api_key)
             st.write(f"You (transcribed): {prompt}")
 
