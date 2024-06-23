@@ -4,7 +4,9 @@ import streamlit as st
 import openai
 import tempfile
 import logging
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+from pydub import AudioSegment
+from io import BytesIO
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode
 import av
 import numpy as np
 import queue
@@ -14,38 +16,28 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Function to convert text to speech using OpenAI's API and return audio bytes
-def convert_text_to_speech(text, api_key, model="tts-1", voice="alloy"):
+# Initialize OpenAI client instance
+def init_openai(api_key):
     openai.api_key = api_key
-    logger.info(f"{datetime.now()} - Converting text to speech")
-    response = openai.Audio.create(
-        model=model,
-        voice=voice,
-        input=text
+    return openai
+
+# Function to generate speech from text
+def generate_speech(text, client):
+    response = client.Audio.create(
+        model="tts-1",
+        voice="alloy",
+        input=text,
     )
-    audio_content = response['audio']
-    return audio_content
+    audio_content = response["audio"]
+    st.audio(audio_content, format="audio/mp3")
 
-# Function to convert speech to text using OpenAI's API and return text transcription
-def convert_speech_to_text(audio_data, api_key):
-    openai.api_key = api_key
-    logger.info(f"{datetime.now()} - Converting speech to text")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
-        temp_audio_file.write(audio_data)
-        temp_audio_file_path = temp_audio_file.name
-    with open(temp_audio_file_path, "rb") as audio_file:
-        response = openai.Audio.transcriptions.create(
-            file=audio_file,
-            model="whisper-1"
-        )
-    return response['text']
-
-# Function to convert audio bytes to base64
-def audio_bytes_to_base64(audio_bytes, audio_format="mp3"):
-    logger.info(f"{datetime.now()} - Converting audio bytes to base64")
-    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-    audio_str = f"data:audio/{audio_format};base64,{audio_base64}"
-    return audio_str
+# Function to transcribe speech to text
+def transcribe_speech(file_buffer, client):
+    response = client.Audio.transcriptions.create(
+        file=file_buffer,
+        model="whisper-1"
+    )
+    return response["text"]
 
 # Audio processor for webrtc_streamer
 class AudioProcessor(AudioProcessorBase):
@@ -67,17 +59,25 @@ if not openai_api_key:
     st.error("Please set the OpenAI API key as an environment variable.")
     st.stop()
 
+# Initialize OpenAI client
+openai_client = init_openai(openai_api_key)
+
 # Main title and caption
 st.title("💬 Chatbot with TTS and STT")
 st.caption("🚀 A Streamlit chatbot powered by OpenAI with TTS and STT")
 
-# Initialize messages in session state if not already present
+# Initialize session state for messages
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+
+# Display message history
+for msg in st.session_state["messages"]:
+    st.chat_message(msg["role"]).write(msg["content"])
 
 # Handle voice input
 webrtc_ctx = webrtc_streamer(
     key="audio",
+    mode=WebRtcMode.SENDONLY,
     rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
     media_stream_constraints={
         "audio": True,
@@ -93,29 +93,52 @@ if webrtc_ctx.audio_processor:
     if audio_data:
         try:
             logger.info(f"{datetime.now()} - Audio data captured.")
-            prompt = convert_speech_to_text(audio_data, openai_api_key)
-            st.write(f"Transcription: {prompt}")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
+                temp_audio_file.write(audio_data)
+                temp_audio_file_path = temp_audio_file.name
 
-            openai.api_key = openai_api_key
-            st.session_state.messages.append({"role": "user", "content": prompt})
+            with open(temp_audio_file_path, "rb") as audio_file:
+                prompt = transcribe_speech(audio_file, openai_client)
+                st.write(f"Transcription: {prompt}")
 
-            logger.info(f"{datetime.now()} - Sending transcription to OpenAI ChatCompletion API...")
-            response = openai.ChatCompletion.create(
-                model="gpt-4o",
-                messages=st.session_state["messages"]
-            )
-            msg = response.choices[0].message['content']
-            st.session_state["messages"].append({"role": "assistant", "content": msg})
-            st.write(f"Assistant: {msg}")
+                st.session_state["messages"].append({"role": "user", "content": prompt})
 
-            logger.info(f"{datetime.now()} - Converting response to audio...")
-            audio_content = convert_text_to_speech(msg, openai_api_key)
-            audio_str = audio_bytes_to_base64(audio_content)
-            st.audio(audio_str, format="audio/mp3")
+                logger.info(f"{datetime.now()} - Sending transcription to OpenAI ChatCompletion API...")
+                response = openai_client.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=st.session_state["messages"]
+                )
+                msg = response.choices[0]["message"]["content"]
+                st.session_state["messages"].append({"role": "assistant", "content": msg})
+                st.write(f"Assistant: {msg}")
+
+                # Convert response to audio and play it
+                logger.info(f"{datetime.now()} - Converting response to audio...")
+                generate_speech(msg, openai_client)
         except Exception as e:
             logger.error(f"{datetime.now()} - An error occurred: {e}")
             st.error(f"An error occurred: {e}")
 
-# Display chat history
-for msg in st.session_state["messages"]:
-    st.write(f"{msg['role'].capitalize()}: {msg['content']}")
+# Provide options to generate speech or upload voice for transcription
+if prompt := st.chat_input():
+    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
+
+    response = openai_client.ChatCompletion.create(
+        model="gpt-4",
+        messages=st.session_state["messages"]
+    )
+
+    msg = response.choices[0]["message"]["content"]
+    st.session_state["messages"].append({"role": "assistant", "content": msg})
+    st.chat_message("assistant").write(msg)
+
+    if st.button("Generate Speech"):
+        generate_speech(msg, openai_client)
+
+uploaded_file = st.file_uploader("Upload Audio for Transcription", type=["mp3", "wav"])
+if uploaded_file is not None:
+    file_buffer = BytesIO(uploaded_file.read())
+    transcribed_text = transcribe_speech(file_buffer, openai_client)
+    st.write("Transcribed text: ", transcribed_text)
+
