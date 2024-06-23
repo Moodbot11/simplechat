@@ -3,7 +3,7 @@ import base64
 import streamlit as st
 import openai
 import tempfile
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, ClientSettings
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
 import av
 import numpy as np
 import queue
@@ -43,11 +43,12 @@ class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.audio_queue = queue.Queue()
 
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        audio = frame.to_ndarray()
-        audio = (audio * 32767).astype(np.int16)  # Convert to 16-bit PCM
-        self.audio_queue.put(audio.tobytes())
-        return frame
+    def recv_queued(self, frames: av.AudioFrame) -> av.AudioFrame:
+        for frame in frames:
+            audio = frame.to_ndarray()
+            audio = (audio * 32767).astype(np.int16)  # Convert to 16-bit PCM
+            self.audio_queue.put(audio.tobytes())
+        return frames[-1]
 
 # Sidebar config
 with st.sidebar:
@@ -67,17 +68,15 @@ if "messages" not in st.session_state:
 # Handle voice input
 webrtc_ctx = webrtc_streamer(
     key="audio",
-    client_settings=ClientSettings(
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        media_stream_constraints={
-            "audio": True,
-            "video": False,
-        },
-    ),
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    media_stream_constraints={
+        "audio": True,
+        "video": False,
+    },
     audio_processor_factory=AudioProcessor,
 )
 
-if webrtc_ctx.audio_processor and webrtc_ctx.state.playing:
+if webrtc_ctx.state.playing:
     audio_processor = webrtc_ctx.audio_processor
     audio_data = b"".join(list(audio_processor.audio_queue.queue))
 
@@ -106,5 +105,5 @@ for msg in st.session_state.messages:
     st.write(f"{msg['role'].capitalize()}: {msg['content']}")
 
 # Error handling for the WebRTC context
-if webrtc_ctx.state.status == "failed":
+if webrtc_ctx.state.iceConnectionState == "failed":
     st.error("WebRTC connection failed. Please check your network settings and try again.")
